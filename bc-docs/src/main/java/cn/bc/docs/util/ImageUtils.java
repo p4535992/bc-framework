@@ -383,7 +383,9 @@ public class ImageUtils {
      * 按指定的配置沿水平、垂直方向混合合并图片
      *
      * @param imageStreams
-     * @param mixConfig    如"1,1,1;1,1"表示前三张水平合并，后2张水平合并，之后再垂直合并
+     * @param mixConfig    如"1,1,1;1,1"表示前三张水平合并，后2张水平合并，之后再垂直合并；
+     *                     如果要控制合并的间隙："1:5 6 7 8,1;1,1"，表示第一张图片合并时上、右、下、左的间隙为5、6、7、8个像素；
+     *                     "1:5 6,1;1,1"，表示第一张图片合并时上下、左右的间隙为5、6个像素；
      * @return
      * @throws IOException
      */
@@ -405,5 +407,93 @@ public class ImageUtils {
             vimages[i] = combineHorizontal(himages);
         }
         return combineVertical(vimages);
+    }
+
+    /**
+     * 将图片沿水平方向合并在一起
+     *
+     * @param imagers 要合并的图像
+     * @param gap    合并图像之间的间隙
+     * @return
+     * @throws IOException
+     */
+    public static BufferedImage combineHorizontal(Imager[] imagers) {
+        int width = 0, height = 0;
+        boolean opaque = false;// 要合并的图片中是否存在不透明的
+        int i = 0;
+        for (BufferedImage image : images) {
+            width += image.getWidth();
+            height = Math.max(height, image.getHeight());
+            if (image.getTransparency() == Transparency.OPAQUE) {
+                opaque = true;
+            }
+
+            // 考虑间隙
+            if (i > 0) width = width + gap;
+            i++;
+        }
+
+        // 创建空白图像
+        BufferedImage imageNew = new BufferedImage(width, height, opaque ?
+                BufferedImage.TYPE_INT_RGB : BufferedImage.TYPE_INT_ARGB);
+
+        // 如果有一张图不支持透明，就设置全局背景为白色（否则保存为jpg时，空白区为黑色）
+        if (opaque) {
+            Graphics2D g = (Graphics2D) imageNew.getGraphics();
+            g.setBackground(Color.WHITE);
+            g.clearRect(0, 0, width, height);
+        }
+
+        int startX = 0;
+        int[] ImageArrayOne;
+        i = 0;
+        for (BufferedImage image1 : images) {
+            width = image1.getWidth();
+            height = image1.getHeight();
+
+            ImageArrayOne = new int[width * height];
+            ImageArrayOne = image1.getRGB(0, 0, width, height, ImageArrayOne,
+                    0, width);
+
+            // 添加间隙
+            if (i > 0) startX = startX + gap;
+            i++;
+
+            imageNew.setRGB(startX, 0, width, height, ImageArrayOne, 0, width);
+            startX += width;
+        }
+
+        return imageNew;
+    }
+
+    /**
+     * 要合并图片的数据封装
+     */
+    private class Imager {
+        private BufferedImage image;// 原图
+        private int left;// 左间隙
+        private int right;// 右间隙
+        private int top;// 上间隙
+        private int bottom;// 下间隙
+
+        public Imager(BufferedImage image, int top, int right, int bottom, int left) {
+            this.image = image;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
+            this.left = left;
+        }
+
+        public Imager(BufferedImage image, int topBottom, int leftRight) {
+            this(image, topBottom, leftRight, topBottom, leftRight);
+        }
+
+        public Imager(BufferedImage image, int all) {
+            this(image, all, all, all, all);
+        }
+
+        public Imager(BufferedImage image) {
+            this(image, 0, 0, 0, 0);
+        }
     }
 }
